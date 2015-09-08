@@ -53,15 +53,18 @@ train_char[train_char==-1] = NA
 train_char[train_char==""] = NA
 train_char[train_char=="[]"] = NA
 
+train_date = train_char[,grep("JAN1|FEB1|MAR1", train_char),]
 
+train_char = train_char[, !colnames(train_char) %in% colnames(train_date)]
+train_date = sapply(train_date, function(x) strptime(x, "%d%B%y:%H:%M:%S"))
+train_date = do.call(cbind.data.frame, train_date)
 
+train_time = train_date[,colnames(train_date) %in% c("VAR_0204","VAR_0217")]
+train_time = data.frame(sapply(train_time, function(x) strftime(x, "%H:%M:%S")))
+train_hour = as.data.frame(sapply(train_time, function(x) as.numeric(as.character(substr( x ,1, 2)))))
 
-
-
-
-
-
-
+par(mar=c(2,2,2,2),mfrow=c(4,4))
+for(i in 1:16) hist(train_date[,i], "weeks", format = "%d %b %y", main = colnames(train_date)[i], xlab="", ylab="")
 
 
 

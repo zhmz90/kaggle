@@ -8,11 +8,14 @@ set.seed(721) #seed bag1:8, then eta=0.06not0.04&nround125not250: bag2:64, bag3:
 #seed bag9:9999, 0.02,300,random
 
 #bag10:425, bag11:718, bag12:719, bag13:720, bag14:721
-
+rm(list = setdiff(ls(), lsf.str()))
 
 cat("reading the train and test data\n")
 train <- read_csv("../data/train.csv")
 test  <- read_csv("../data/test.csv")
+
+
+
 
 train.unique.count=lapply(train, function(x) length(unique(x)))
 train.unique.count_1=unlist(train.unique.count[unlist(train.unique.count)==1])
@@ -29,7 +32,7 @@ delete_NA918=names(which(unlist(lapply(train[,(names(train) %in% names(train.uni
 print(length(c(delete_const,delete_NA56,delete_NA89,delete_NA918)))
 
 train=train[,!(names(train) %in% c(delete_const,delete_NA56,delete_NA89,delete_NA918))]
-test=test[,!(names(test) %in% c(delete_const,delete_NA56,delete_NA89,delete_NA918))]
+#test=test[,!(names(test) %in% c(delete_const,delete_NA56,delete_NA89,delete_NA918))]
 
 # From manual data analysis
 datecolumns = c("VAR_0073", "VAR_0075", "VAR_0156", "VAR_0157", "VAR_0158", "VAR_0159", "VAR_0166", "VAR_0167", "VAR_0168", "VAR_0176", "VAR_0177", "VAR_0178", "VAR_0179", "VAR_0204", "VAR_0217")
@@ -65,7 +68,7 @@ train$target <- NULL
 train$target <- train_target
 
 feature.names <- names(train)[2:ncol(train)-1]
-# names(train)  # 1934 variables
+#names(train)  # 1934 variables
 
 for (f in feature.names) {
   if (class(train[[f]])=="character") {
@@ -83,14 +86,17 @@ cat("sampling train to get around 8GB memory limitations\n")
 train <- train[sample(nrow(train), 120000),]
 gc()
 
-h <- sample(nrow(train), 80000)
+#h <- sample(nrow(train), 4000)#80000)
 
-val<-train[-h,]
+#val<-train[-h,]
+#val_final <- val[1:2000,]
+#val <- val[4001:8000,]
+#gc()
+
+#train <-train[h,]
 gc()
-
-train <-train[h,]
-gc()
-
+#pos_weight = sum(train$target==1) / sum(train$target==0)
+#print(pos_weight)
 #for bag 6
 #val=train[80001:120000,]
 #train=train[1:80000,]
@@ -103,32 +109,38 @@ gc()
 
 dtrain <- xgb.DMatrix(data.matrix(train[,feature.names]), label=train$target)
 
-train=train[1:3,]
+#train=train[1:3,]
 gc()
 
 
-dval <- xgb.DMatrix(data.matrix(val[,feature.names]), label=val$target)
-val=val[1:3,]
-gc()
+#dval <- xgb.DMatrix(data.matrix(val[,feature.names]), label=val$target,missing = NaN)
+#val=val[1:3,]
+#gc()
 
-watchlist <- watchlist <- list(eval = dval, train = dtrain)
+#watchlist <- watchlist <- list(eval = dval, train = dtrain)
+
+
 
 param <- list(  objective           = "binary:logistic", 
+                #nthread = 70,
                 # booster = "gblinear",
-                eta                 = 0.01, #0.06, #0.01,
-                max_depth           = 8,  # changed from default of 8
-                subsample           = 0.7,
-                colsample_bytree    = 0.7,
-                eval_metric         = "auc"
-                # alpha = 0.0001, 
-                # lambda = 1
+                eta                 = 0.01,#0.01(benchmark), #0.06, #0.01,
+                max_depth           = 8,#,###8(benchmark),  # changed from default of 8
+                subsample           = 0.7,#0.7,
+                colsample_bytree    = 0.7
+ #               eval_metric         = "auc"
+                #alpha = 0.1,#0.0001 
+                #lambda = 0.5,#1
+                #scale_pos_weight = pos_weight
 )
 
-clf <- xgb.train(   params              = param, 
-                    data                = dtrain, 
-                    nrounds             = 950, #300, #280, #125, #250, # changed from 300
+#clf <- xgb.cv( param, dtrain, 2000, nfold = 5, metrics = "auc") 
+ clf <- xgb.train( params                = param,                   
+                    #nfold               = 5,
+                    data                =  dtrain, 
+                    nrounds             = 2000, ###950(benchmark), #300, #280, #125, #250, # changed from 300
                     verbose             = 2, 
-                    watchlist           = watchlist,
+                  #  watchlist           = watchlist,
                     maximize            = TRUE)
 
 
@@ -140,6 +152,9 @@ gc()
 
 submission <- data.frame(ID=test$ID)
 submission$target <- NA 
+
+
+
 for (rows in split(1:nrow(test), ceiling((1:nrow(test))/10000))) {
   submission[rows, "target"] <- predict(clf, data.matrix(test[rows,feature.names]))
   
